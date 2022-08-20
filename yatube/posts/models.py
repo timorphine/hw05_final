@@ -3,7 +3,6 @@ from django.db import models
 
 from . import constants
 
-
 User = get_user_model()
 
 
@@ -50,7 +49,7 @@ class Post(models.Model):
         ordering = ['-pub_date']
 
     def __str__(self):
-        return self.text[:constants.str_length]
+        return self.text[:constants.STR_LENGTH]
 
 
 class Comment(models.Model):

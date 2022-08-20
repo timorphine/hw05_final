@@ -8,8 +8,7 @@ from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
-
-from posts.models import Group, Post, Follow
+from posts.models import Follow, Group, Post
 
 User = get_user_model()
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
@@ -129,10 +128,10 @@ class PostsViewsTest(TestCase):
             reverse('posts:post_detail',
                     kwargs={'post_id': self.post.id})
         )
-        self.assertIn('post_list', response.context)
-        post_list = response.context['post_list']
+        self.assertIn('posts_count', response.context)
+        post_count = response.context['posts_count']
         post = response.context['post']
-        self.assertEqual(post_list, 1)
+        self.assertEqual(post_count, 1)
         self.context_test(post)
 
     def test_create_post_page_show_correct_context(self):
@@ -193,52 +192,29 @@ class PaginatorViewsTest(TestCase):
             )
             )
         cls.post = Post.objects.bulk_create(posts)
+        cache.clear()
 
     def setUp(self):
         cache.clear()
 
-    def test_home_first_page_contains_ten_records(self):
-        response = self.authorized_client.get(reverse('posts:home_page'))
-        self.assertEqual(len(response.context['page_obj']), 10)
-
-    def test_home_second_page_contains_three_records(self):
-        response = self.authorized_client.get(
-            reverse('posts:home_page') + '?page=2'
-        )
-        self.assertEqual(len(response.context['page_obj']), 3)
-
-    def test_group_first_page_contains_ten_records(self):
-        response = self.authorized_client.get(
-            reverse('posts:group_posts',
-                    kwargs={'slug': self.group.slug})
-        )
-        self.assertEqual(len(response.context['page_obj']), 10)
-
-    def test_group_second_page_contains_three_records(self):
-        response = self.authorized_client.get(
-            reverse(
-                'posts:group_posts',
-                kwargs={'slug': self.group.slug}
-            ) + '?page=2'
-        )
-        self.assertEqual(len(response.context['page_obj']), 3)
-
-    def test_profile_first_page_contains_ten_records(self):
-        response = self.authorized_client.get(
-            reverse('posts:profile',
-                    kwargs={'username': self.user})
-        )
-        self.assertEqual(len(response.context['page_obj']), 10)
-
-    def test_profile_second_page_contains_ten_records(self):
-        response = self.authorized_client.get(
-            reverse(
-                'posts:profile',
-                kwargs={'username': self.user}
-            ) + '?page=2'
-        )
-        self.assertEqual(len(response.context['page_obj']), 3)
-
+    def test_pagination(self):
+        urls = {
+            'posts:home_page': {},
+            'posts:group_posts': {"slug": self.group.slug},
+            'posts:profile': {"username": self.user}
+        }
+        for url, kwargs in urls.items():
+            with self.subTest(url=url):
+                response = self.authorized_client.get(
+                    reverse(url, kwargs=kwargs)
+                )
+                self.assertEqual(len(response.context['page_obj']), 10)
+        for url_2, kwargs_2 in urls.items():
+            with self.subTest(url=url):
+                response = self.authorized_client.get(
+                    reverse(url_2, kwargs=kwargs_2), {"page": 2}
+                )
+                self.assertEqual(len(response.context['page_obj']), 3)
 
 class PostCreateTest(TestCase):
     @classmethod
@@ -262,6 +238,7 @@ class PostCreateTest(TestCase):
             title='SecondGroup',
             slug='second-slug'
         )
+        cache.clear()
 
     def test_post_in_right_place(self):
         """Проверяем появление поста на страницах."""
@@ -336,7 +313,7 @@ class TestFollow(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(self.sec_user)
 
-    def test_that_user_can_follow_unfollow(self):
+    def test_user_can_follow(self):
         response = self.authorized_client.get(
             reverse(
                 'posts:profile_follow',
@@ -347,6 +324,8 @@ class TestFollow(TestCase):
             response,
             f'/profile/{self.user}/'
         )
+
+    def test_user_can_unfollow(self):
         response = self.authorized_client.get(
             reverse(
                 'posts:profile_unfollow',
@@ -358,16 +337,27 @@ class TestFollow(TestCase):
             f'/profile/{self.user}/'
         )
 
-    def test_that_posts_shows_only_for_followers(self):
+    def test_post_shows_for_follower(self):
         Follow.objects.create(
             user=self.sec_user,
             author=self.user
         )
-        response_1 = self.authorized_client.get(
+        response = self.authorized_client.get(
             reverse('posts:follow_index')
         )
+        self.assertEqual(response.context['page_obj'][0], self.post)
+
+    def test_post_not_shows_for_not_follower(self):
         self.authorized_client.force_login(self.user)
-        response_2 = self.authorized_client.get(
+        Post.objects.create(
+            author=self.sec_user,
+            text='anothertext'
+        )
+        Follow.objects.create(
+            user=self.sec_user,
+            author=self.user
+        )
+        response = self.authorized_client.get(
             reverse('posts:follow_index')
         )
-        self.assertNotEqual(response_1.content, response_2.content)
+        self.assertEqual(len(response.context['page_obj']), 0)

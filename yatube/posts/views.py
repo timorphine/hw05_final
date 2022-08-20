@@ -2,60 +2,58 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
 
-from .forms import PostForm, CommentForm
-from .models import Group, Post, User, Comment, Follow
-from .pagination import paginator_context, paginator_context_follow
+from .forms import CommentForm, PostForm
+from .models import Comment, Follow, Group, Post, User
+from .pagination import paginator_context
 
 
 @cache_page(20, key_prefix='home_page')
 def index(request):
-    context = paginator_context(Post.objects.all(), request)
+    obj = paginator_context(
+        Post.objects.select_related('group').all(), request
+    )
+    context = {"page_obj": obj}
     return render(request, "posts/index.html", context)
 
 
 def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
-    context = {
-        "group": group
-    }
-    context.update(paginator_context(
-        Post.objects.all().filter(group=group),
+    obj = paginator_context(
+        group.posts.all(),
         request)
-    )
+    context = {
+        "group": group,
+        "page_obj": obj
+    }
     return render(request, "posts/group_list.html", context)
 
 
 def profile(request, username):
     author = get_object_or_404(User, username=username)
-    post_count = Post.objects.all(
-    ).filter(author=author).count()
-    if request.user.is_authenticated:
-        following = Follow.objects.filter(
-            user=request.user,
-            author=author
-        ).exists()
-    else:
-        following = False
+    post_count = author.posts.count()
+    following = request.user.is_authenticated and Follow.objects.filter(
+        user=request.user, author=author
+    ).exists()
+    obj = paginator_context(
+        author.posts.all(),
+        request)
     context = {
         "author": author,
         "post_count": post_count,
-        "following": following
+        "following": following,
+        "page_obj": obj
     }
-    context.update(paginator_context(
-        Post.objects.all().filter(author=author),
-        request)
-    )
     return render(request, "posts/profile.html", context)
 
 
 def post_detail(request, post_id):
     post = get_object_or_404(Post, id=post_id)
     form = CommentForm(request.POST or None)
-    comments = Comment.objects.all()
-    post_list = Post.objects.all().filter(author_id=post.author).count()
+    comments = Comment.objects.filter(post_id=post_id)
+    posts_count = Post.objects.filter(author_id=post.author).count()
     context = {
         "post": post,
-        "post_list": post_list,
+        "posts_count": posts_count,
         "form": form,
         "comments": comments
     }
@@ -112,34 +110,21 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    follow_list = Follow.objects.filter(user=request.user)
-    post_list = Post.objects.filter(
-        author__following__user=request.user)
-    context = {
-        'follow_list': follow_list,
-        'post_list': post_list
-    }
-    context.update(
-        paginator_context_follow(
-            post_list,
-            request
-        )
+    obj = paginator_context(Post.objects.select_related('author').filter(
+        author__following__user=request.user), request
     )
+    context = {
+        'page_obj': obj
+    }
     return render(request, 'posts/follow.html', context)
 
 
 @login_required
 def profile_follow(request, username):
     post_author = get_object_or_404(User, username=username)
-    if request.user == post_author:
-        return redirect('posts:profile', username=username)
-    if Follow.objects.filter(user=request.user, author=post_author).exists():
-        return redirect('posts:profile', username=username)
-    Follow.objects.create(
-        user=request.user,
-        author=post_author
-    )
-    return redirect('posts:profile', username=username)
+    if request.user != post_author:
+        Follow.objects.get_or_create(user=request.user, author=post_author)
+    return redirect('posts:profile', username=username) 
 
 
 @login_required

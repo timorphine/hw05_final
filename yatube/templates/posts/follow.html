@@ -6,7 +6,7 @@
   <h1>Избранные авторы</h1>
   <p>
     {% include 'posts/includes/switcher.html' %}
-{% for post in post_list %}
+{% for post in page_obj %}
   <ul>
     <li>
       {% if post.group %}

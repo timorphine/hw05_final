@@ -7,8 +7,7 @@ from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
-
-from posts.models import Group, Post, Comment
+from posts.models import Comment, Group, Post
 
 User = get_user_model()
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
@@ -125,11 +124,11 @@ class PostCreateForm(TestCase):
         self.assertEqual(Post.objects.count(), obj_count)
         self.assertTrue(
             Post.objects.filter(
-                text=changed_post_form['text'],
+                id=self.post.id,
                 image='posts/smallest.gif'
             ).exists()
         )
-        changed_post = Post.objects.get(id=1)
+        changed_post = Post.objects.get(id=self.post.id)
         self.assertEqual(changed_post.text, changed_post_form['text'])
         self.assertEqual(changed_post.group, self.post.group)
         self.assertEqual(changed_post.author, self.post.author)

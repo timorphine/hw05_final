@@ -1,19 +1,9 @@
 from django.core.paginator import Paginator
+from yatube.settings import POSTS_PER_PAGE
 
 
 def paginator_context(queryset, request):
     page_number = request.GET.get('page')
-    paginator = Paginator(queryset, 10)
+    paginator = Paginator(queryset, POSTS_PER_PAGE)
     page_obj = paginator.get_page(page_number)
-    return {
-        'page_obj': page_obj
-    }
-
-
-def paginator_context_follow(queryset, request):
-    page_number = request.GET.get('page')
-    paginator = Paginator(queryset, 10)
-    page_obj = paginator.get_page(page_number)
-    return {
-        'page_obj': page_obj
-    }
+    return page_obj

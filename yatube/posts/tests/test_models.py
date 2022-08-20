@@ -25,7 +25,7 @@ class PostModelTest(TestCase):
     def test_models_have_correct_object_names(self):
         """Проверяем, что у модели Post корректно работает __str__."""
         test_post = PostModelTest.post
-        expected = test_post.text[:constants.str_length]
+        expected = test_post.text[:constants.STR_LENGTH]
         self.assertEqual(expected, str(test_post))
 
 

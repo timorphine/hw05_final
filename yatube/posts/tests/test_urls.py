@@ -1,9 +1,8 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
 from django.core.cache import cache
-
+from django.test import Client, TestCase
 from posts.models import Group, Post
 
 User = get_user_model()
@@ -32,25 +31,18 @@ class PostsURLTests(TestCase):
         self.not_author_client = Client()
         self.not_author_client.force_login(self.not_author)
 
-    def test_home_page_response(self):
-        """Тест ответа домашней страницы."""
-        response = self.client.get('/')
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_group_page_response(self):
-        """Тест ответа страницы с группами."""
-        response = self.client.get(f'/group/{self.group.slug}/')
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_profile_response(self):
-        """Тест ответа страницы профиля"""
-        response = self.client.get(f'/profile/{self.user}/')
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_post_detail_reponse(self):
-        """Тест ответа страницы с подробностями поста."""
-        response = self.client.get(f'/posts/{self.post.id}/')
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+    def test_page_responses_for_authorized(self):
+        urls = {
+            '/',
+            f'/group/{self.group.slug}/',
+            f'/profile/{self.user}/',
+            f'/posts/{self.post.id}/',
+            '/create/'
+        }
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.not_author_client.get(url)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_unexisting_page_response(self):
         """Тест ответа несуществующей страницы."""
@@ -61,11 +53,6 @@ class PostsURLTests(TestCase):
         """Тест редиректа со страницы create для неавторизованного юзера."""
         response = self.client.get('/create/')
         self.assertRedirects(response, '/auth/login/?next=/create/')
-
-    def test_create_page_for_auth(self):
-        """Тест ответа страницы create для авторизованного юзера."""
-        response = self.autorized_client.get('/create/')
-        self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_post_edit_for_guest(self):
         self.guest_client = Client()

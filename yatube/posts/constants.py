@@ -1,1 +1,1 @@
-str_length = 15
+STR_LENGTH = 15
