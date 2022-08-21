@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import shutil
 import tempfile
 
@@ -297,6 +299,11 @@ class TestCache(TestCase):
         self.assertEqual(
             first_response.content, second_response.content
         )
+        cache.clear()
+        cleared_response = self.authorized_client.get(
+            reverse('posts:home_page')
+        )
+        self.assertNotEqual(second_response.content, cleared_response.content)
 
 
 class TestFollow(TestCase):
@@ -315,6 +322,7 @@ class TestFollow(TestCase):
         self.authorized_client.force_login(self.sec_user)
 
     def test_user_can_follow(self):
+        follow_count = Follow.objects.count()
         response = self.authorized_client.get(
             reverse(
                 'posts:profile_follow',
@@ -325,11 +333,15 @@ class TestFollow(TestCase):
             response,
             f'/profile/{self.user}/'
         )
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertEqual(Follow.objects.count(), follow_count + 1)
+        self.assertTrue(Follow.objects.filter(user=self.sec_user).exists())
 
     def test_user_can_unfollow(self):
+        follow_count = Follow.objects.count()
         response = self.authorized_client.get(
             reverse(
-                'posts:profile_unfollow',
+                'posts:profile_follow',
                 kwargs={'username': self.user}
             )
         )
@@ -337,6 +349,15 @@ class TestFollow(TestCase):
             response,
             f'/profile/{self.user}/'
         )
+        self.assertEqual(Follow.objects.count(), follow_count + 1)
+        unfollow_response = self.authorized_client.get(
+            reverse(
+                'posts:profile_unfollow',
+                kwargs={'username': self.user}
+            )
+        )
+        self.assertEqual(unfollow_response.status_code, HTTPStatus.FOUND)
+        self.assertEqual(Follow.objects.count(), follow_count)
 
     def test_post_shows_for_follower(self):
         Follow.objects.create(
@@ -353,10 +374,6 @@ class TestFollow(TestCase):
         Post.objects.create(
             author=self.sec_user,
             text='anothertext'
-        )
-        Follow.objects.create(
-            user=self.sec_user,
-            author=self.user
         )
         response = self.authorized_client.get(
             reverse('posts:follow_index')
