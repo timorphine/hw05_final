@@ -1,4 +1,5 @@
 from django.core.paginator import Paginator
+
 from yatube.settings import POSTS_PER_PAGE
 
 

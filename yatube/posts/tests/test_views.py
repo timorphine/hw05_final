@@ -1,7 +1,6 @@
-from http import HTTPStatus
-
 import shutil
 import tempfile
+from http import HTTPStatus
 
 from django import forms
 from django.conf import settings
